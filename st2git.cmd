@@ -1,2 +1,2 @@
-python stsync.py
+python st2git.py
 pause
