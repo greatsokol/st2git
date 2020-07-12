@@ -1,0 +1,2 @@
+python stsync.py
+pause
