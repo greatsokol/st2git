@@ -43,6 +43,7 @@ ERROR_MESSAGES = ['Some of the required resources are currently in use by other 
                   'An existing connection was forcibly closed by the remote host',
                   'Unable to update file status information in the database on the local workstation',
                   "index.lock' could not be obtained",
+                  'The logon procedure is no longer active on the server',
                   'Read timed out']
 
 
