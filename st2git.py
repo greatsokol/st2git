@@ -43,8 +43,7 @@ ERROR_MESSAGES = ['Some of the required resources are currently in use by other 
                   'An existing connection was forcibly closed by the remote host',
                   'Unable to update file status information in the database on the local workstation',
                   "index.lock' could not be obtained",
-                  'The logon procedure is no longer active on the server',
-                  'Read timed out']
+                  'Read timed out', 'Connection reset']
 
 
 #
@@ -198,7 +197,7 @@ class GlobalSettings:
         return self.__success
 
     def read_config(self):
-        ini_filename = 'settings.ini'
+        ini_filename = '{}.ini'.format(__file__)
         section_special = 'SPECIAL'
         section_common = 'COMMON'
         try:
@@ -270,20 +269,21 @@ def ask_starteam_password(settings):
 
 
 # -------------------------------------------------------------------------------------------------
-def git_init():
+def git_init(git_url):
     # bare_repo = Repo.init(os.path.join(DIR_GIT_BARE_REPO, 'bare-repo'), bare=True)
     # del bare_repo
     # cloned_repo = Repo.clone_from(DIR_GIT_BARE_REPO, DIR_GIT_REPO)
     # log('Success repo init for path={}'.format(DIR_GIT_BARE_REPO))
     # return cloned_repo
-    get_repo = Repo.init(PATH_GIT_REPO)
-    origin = get_repo.create_remote('origin', 'https://git.bssys.com/gazprombank1/gpb-20.1.test')
+    git_repo = Repo.init(PATH_GIT_REPO)
+    origin = git_repo.create_remote('origin', git_url)
     exists = origin.exists()
     # log('{}'.format(exists))
     if exists:
-        # origin.fetch()
-        # get_repo.create_head('master', origin.refs.master)
-        return get_repo
+        #origin.fetch()
+        #git_repo.create_head('master', origin.refs.master)
+        #git_repo.heads.master.set_tracking_branch(['origin'])
+        return git_repo
     else:
         return None
 
@@ -307,8 +307,11 @@ def git_add_file(git_repo, file_path, file_name, author, date, comment, revision
         try:
             git_author = Actor(author, '')
             commit_time = st_time_to_utc(date)
-            git_repo.index.commit('{}'.format(comment) if comment else '', author=git_author, commit_date=commit_time)
-            git_repo.active_branch.commit = git_repo.commit('master')
+            git_repo.index.commit('{}'.format(comment) if comment else '',
+                                  head=True,
+                                  author=git_author,
+                                  commit_date=commit_time)
+            #git_repo.active_branch.commit = git_repo.commit('master')
             success = True
         except Exception as exc:
             kill_app('Commit exception: {}'.format(exc))
@@ -573,7 +576,7 @@ def run():
     global_settings = GlobalSettings()
     cleaned = clean(PATH_GIT_REPO) and clean(PATH_TEMP)
     not_inited = not global_settings.was_success() or not cleaned or not ask_starteam_password(global_settings)
-    git_repo = git_init()
+    git_repo = git_init(global_settings.git_url)
     if not_inited or not git_repo:
         return
 
