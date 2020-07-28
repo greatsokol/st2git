@@ -46,7 +46,11 @@ ERROR_MESSAGES = ['Some of the required resources are currently in use by other 
                   'Read timed out', 'Connection reset']
 
 
-#
+def filename(ext):
+    return '{}.{}'.format(os.path.splitext(__file__)[0], ext)
+
+
+# -------------------------------------------------------------------------------------------------
 def kill_app(message):
     # Инным способом остановить все потоки не получается
     log('KILLIG APP {}'.format(message))
@@ -60,7 +64,7 @@ def log(message_text, indent=False):
         message_text = '[{}_{}] {}'.format(threading.get_ident(), threading.current_thread().name, str(message_text))
         if indent:
             message_text = '\n' + message_text
-        log_file_name = os.path.join(PATH_ROOT, 'log.txt')
+        log_file_name = os.path.join(PATH_ROOT, filename('log'))
         with open(log_file_name, mode='a') as f:
             print(message_text)
             f.writelines('\n' + message_text)
@@ -197,7 +201,7 @@ class GlobalSettings:
         return self.__success
 
     def read_config(self):
-        ini_filename = '{}.ini'.format(__file__)
+        ini_filename = filename('ini')
         section_special = 'SPECIAL'
         section_common = 'COMMON'
         try:
