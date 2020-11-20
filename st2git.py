@@ -47,6 +47,10 @@ ERROR_MESSAGES = ['Some of the required resources are currently in use by other 
                   'Failed to login to Active Directory server.']
 
 
+def filename(ext):
+    return '{}.{}'.format(os.path.splitext(__file__)[0], ext)
+
+
 #
 def kill_app(message):
     # Инным способом остановить все потоки не получается
