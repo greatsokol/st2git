@@ -43,14 +43,11 @@ ERROR_MESSAGES = ['Some of the required resources are currently in use by other 
                   'An existing connection was forcibly closed by the remote host',
                   'Unable to update file status information in the database on the local workstation',
                   "index.lock' could not be obtained",
-                  'Read timed out', 'Connection reset']
+                  'Read timed out', 'Connection reset',
+                  'Failed to login to Active Directory server.']
 
 
-def filename(ext):
-    return '{}.{}'.format(os.path.splitext(__file__)[0], ext)
-
-
-# -------------------------------------------------------------------------------------------------
+#
 def kill_app(message):
     # Инным способом остановить все потоки не получается
     log('KILLIG APP {}'.format(message))
@@ -61,10 +58,10 @@ def kill_app(message):
 def log(message_text, indent=False):
     LOCK.acquire(True)
     try:
-        message_text = '[{}_{}] {}'.format(threading.get_ident(), threading.current_thread().name, str(message_text))
+        message_text = '[{}][{}_{}] {}'.format(current_time_str(), threading.get_ident(), threading.current_thread().name, str(message_text))
         if indent:
             message_text = '\n' + message_text
-        log_file_name = os.path.join(PATH_ROOT, filename('log'))
+        log_file_name = os.path.join(PATH_ROOT, 'log.txt')
         with open(log_file_name, mode='a') as f:
             print(message_text)
             f.writelines('\n' + message_text)
@@ -136,10 +133,7 @@ def make_dir(path):
 
 # -------------------------------------------------------------------------------------------------
 def is_file_item(text_item):
-    text_divided_by_space = text_item.split(' ')
-    # для файлов выдает строку с подробностями, для каталогов только название,
-    # поэтому для файла будет массив больше одного элемента, для каталога - один
-    return len(text_divided_by_space) > 1
+    return text_item[-1] != '\\'  # Последний символ в строке с каталогом будет "слэш".
 
 
 # -------------------------------------------------------------------------------------------------
@@ -174,8 +168,8 @@ def clean(path, masks=None, write_log=True):
 
 
 # -------------------------------------------------------------------------------------------------
-def retry(func, *args):
-    log('------------ NEED RETRY. Waiting for 30 sec.')
+def retry(err_str, func, *args):
+    log('------------ NEED RETRY ({}). Waiting for 30 sec.'.format(err_str))
     time.sleep(30)
     log('-------------RETRYING NOW.')
     func(*args)
@@ -201,7 +195,7 @@ class GlobalSettings:
         return self.__success
 
     def read_config(self):
-        ini_filename = filename('ini')
+        ini_filename = 'settings.ini'
         section_special = 'SPECIAL'
         section_common = 'COMMON'
         try:
@@ -301,8 +295,9 @@ def git_add_file(git_repo, file_path, file_name, author, date, comment, revision
         try:
             git_repo.index.add([full_path])
         except Exception as exc:
+            err_str = str(exc)
             if need_retry(str(exc)):
-                retry(git_add_file, git_repo, file_path,
+                retry(err_str, git_add_file, git_repo, file_path,
                       file_name, author, date, comment, revision)
                 return
             else:
@@ -358,16 +353,16 @@ def st_list_anything(settings, command, extra, what, st_path):
         message_text = 'Can not load {} path="{}".'.format(what, st_path)
         if need_retry(err_str):
             log(message_text)
-            retry(st_list_anything, settings, command, extra, what, st_path)
+            retry(err_str, st_list_anything, settings, command, extra, what, st_path)
         else:
             kill_app(message_text + '\n' + err_str)
     else:
         str_res = decode(out)
+        # log('DEBUG OUTPUT: {}'.format(str_res))
         if str_res:
             st_list = str_res.splitlines()
             del st_list[0]  # В первой строке будет путь к виду стартима
             if command != COMMAND_HIST:
-                st_list = [dir_name.strip().replace('\\', '') for dir_name in st_list]
                 st_list.sort()
             return st_list
         else:
@@ -403,7 +398,7 @@ def st_download_one_file(settings, st_path, st_file, root_dir_path, revision):
         message_text = 'Can not download FILE path="{}{}" rev {}.'.format(st_path, st_file, revision)
         if need_retry(err_str):
             log(message_text)
-            retry(st_download_one_file, settings, st_path, st_file, root_dir_path, revision)
+            retry(err_str, st_download_one_file, settings, st_path, st_file, root_dir_path, revision)
         else:
             kill_app(message_text + '\n' + err_str)
     else:
@@ -530,7 +525,7 @@ def st_list_dirs(settings, st_path, excluded_folders=None):
     list_return = []
     for item in st_list:
         if not is_file_item(item):
-            list_dirs.append(item)
+            list_dirs.append(item.strip().replace('\\', ''))
     list_dirs.sort()
 
     if excluded_folders:
@@ -575,7 +570,7 @@ def starteam_run(settings, git_repo, futures, st_path, excluded_folders=None):
 # -------------------------------------------------------------------------------------------------
 def run():
     log('=' * 120)
-    log('BEGIN {}'.format(current_time_str()))
+    log('STARTED')
 
     global_settings = GlobalSettings()
     cleaned = clean(PATH_GIT_REPO) and clean(PATH_TEMP)
@@ -588,8 +583,9 @@ def run():
     starteam_run(global_settings, git_repo, futures, '',
                  ['BLL', 'BLL_Client', 'Doc', '_Personal', 'DBOReports', 'BUILD', 'Scripts',
                   '_TZ', '_ProjectData', '_ProjectData2', 'Config', 'DLL'])
-    # 'SETUP', 'BASE', 'RT_Tpl', 'WWW', 'RTF', 'BLS', 'XSD', 'History',
-    # 'WWW_react', '### Native ReactUI', 'EXTERNAL', 'MIG_UTIL',
+                  
+    # '###MBC41', 'SETUP', 'BASE', 'RT_Tpl', 'WWW', 'RTF',  'XSD', 'History',
+    # 'WWW_react', '### Native ReactUI', 'EXTERNAL', 'MIG_UTIL', #'BLS'
 
     done, not_done = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_EXCEPTION)
     for future in concurrent.futures.as_completed(done):
@@ -597,7 +593,8 @@ def run():
             future.result()
         except Exception as exc:
             log('Thread generated an exception: {}'.format(exc))
-    log('FINISHED {}'.format(current_time_str()))
+
+    log('FINISHED')
 
 
 run()
