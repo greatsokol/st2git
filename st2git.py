@@ -9,6 +9,9 @@ import subprocess
 import threading
 import time
 import uuid
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
 try:
@@ -44,7 +47,10 @@ ERROR_MESSAGES = ['Some of the required resources are currently in use by other 
                   'Unable to update file status information in the database on the local workstation',
                   "index.lock' could not be obtained",
                   'Read timed out', 'Connection reset',
-                  'Failed to login to Active Directory server.']
+                  'Failed to login to Active Directory server',
+                  'Memory allocation failed',
+                  'An invalid argument was encountered',
+                  'Access violation']
 
 
 def filename(ext):
@@ -71,6 +77,30 @@ def log(message_text, indent=False):
             f.writelines('\n' + message_text)
     finally:
         LOCK.release()
+
+
+# -------------------------------------------------------------------------------------------------
+def send_mail(
+        sender,
+        receivers,
+        subject,
+        body,
+        username,
+        password,
+        server_address
+):
+    """Sends an email to the specified receivers using an Exchange server."""
+    message = MIMEMultipart()
+    message["From"] = sender
+    message["To"] = ",".join(receivers)
+    message["Subject"] = subject
+    message.attach(MIMEText(body))
+
+    server = smtplib.SMTP(server_address) #587
+    server.starttls()
+    server.login(username, password)
+    server.sendmail(sender, receivers, message.as_string())
+    server.quit()
 
 
 # -------------------------------------------------------------------------------------------------
