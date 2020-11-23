@@ -176,7 +176,7 @@ def retry(err_str, func, *args):
     log('------------ NEED RETRY ({}). Waiting for 30 sec.'.format(err_str))
     time.sleep(30)
     log('-------------RETRYING NOW.')
-    func(*args)
+    return func(*args)
 
 
 # -------------------------------------------------------------------------------------------------
@@ -301,9 +301,7 @@ def git_add_file(git_repo, file_path, file_name, author, date, comment, revision
         except Exception as exc:
             err_str = str(exc)
             if need_retry(str(exc)):
-                retry(err_str, git_add_file, git_repo, file_path,
-                      file_name, author, date, comment, revision)
-                return
+                return retry(err_str, git_add_file, git_repo, file_path, file_name, author, date, comment, revision)
             else:
                 kill_app('Add exception: {}'.format(exc))
 
@@ -357,7 +355,7 @@ def st_list_anything(settings, command, extra, what, st_path):
         message_text = 'Can not load {} path="{}".'.format(what, st_path)
         if need_retry(err_str):
             log(message_text)
-            retry(err_str, st_list_anything, settings, command, extra, what, st_path)
+            return retry(err_str, st_list_anything, settings, command, extra, what, st_path)
         else:
             kill_app(message_text + '\n' + err_str)
     else:
@@ -402,7 +400,7 @@ def st_download_one_file(settings, st_path, st_file, root_dir_path, revision):
         message_text = 'Can not download FILE path="{}{}" rev {}.'.format(st_path, st_file, revision)
         if need_retry(err_str):
             log(message_text)
-            retry(err_str, st_download_one_file, settings, st_path, st_file, root_dir_path, revision)
+            return retry(err_str, st_download_one_file, settings, st_path, st_file, root_dir_path, revision)
         else:
             kill_app(message_text + '\n' + err_str)
     else:
